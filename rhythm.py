@@ -137,29 +137,49 @@ def transients(file, transients, decay):
         insert(result, i[0] * 2, fin)
     return result.reshape(-1, 2)
 
-def resonances(file, resonances):
+def resonances(file, resonances, crossfadems):
     '''
     stitches together a file of sustained resonances by looking at boundaries
     defined by the onset extraction -- r
     '''
+    crossfade = int((crossfadems / 1000.) * 44100) # gives us crossfade in samples
+    rampup = np.sqrt(np.array([x / (crossfade - 1.) for x in xrange(0, crossfade)]))
+    rampdown = rampup[::-1]
+    ramplen = len(rampup) * 4
+    rampstart = len(rampup) * 2
+    # compute the clicks used for boundaries
     idx, l = clicks(file)
-    idx.append([l, 0])
-    env = envelope(file, 5, 20)
+    idx.append([l - ramplen, 0]) # add the last click so that we add the resonance for the last event
+
+    env = envelope(file, 10, 30)
+    env *= (1 / env.max()) # normalize envelope
+    
     result = np.zeros(l * 2)
     for i in xrange(0, len(idx) - 1):
         # read in a random resonance:
-        reson, sr, enc = wavread(resonances[random.randint(0, len(resonances) - 1)])
+        f = resonances[random.randint(0, len(resonances) - 1)]
+        print "using file " + f
+        reson, sr, enc = wavread(f)
         # assume stereo. need to extract subset equal to onset length:
         reson = reson.reshape(-1) # flatten
-        length = (idx[i + 1][0] - idx[i][0]) * 2
+        length = (idx[i + 1][0] - idx[i][0]) * 2 + ramplen
         start = random.randint(0, len(reson) / 2 - length) # random start place
-        rl = reson[0 : length : 2]
-        rr = reson[1 : length + 1 : 2]
+        rl = reson[start : length + start : 2]
+        rr = reson[start + 1 : length + start + 1 : 2]
+        # fade up rl & rr
+        rl[:len(rampup)] *= rampup
+        rr[:len(rampup)] *= rampup
+        rl[-len(rampup):] *= rampdown
+        rr[-len(rampup):] *= rampdown
+        # combine & insert into result
         fin = np.vstack((rl, rr)).reshape((-1,), order='F')
-        insert(result, idx[i][0] * 2, fin)
+        insert(result, idx[i][0] * 2 - rampstart, fin)
+    result *= (1 / result.max())
     left = result[::2] * env
     right = result[1::2] * env
-    return np.vstack((left, right)).reshape((-1), order='F').reshape(-1, 2)
+    result = np.vstack((left, right)).reshape((-1), order='F')
+    result *= (1 / result.max())
+    return result.reshape(-1, 2)
 
 def applyenvelope(stereo, envelope):
     assert(len(stereo[0]) == 2)
