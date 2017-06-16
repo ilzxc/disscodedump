@@ -1,6 +1,7 @@
 import librosa
 import numpy as np
 import essentia
+import random
 from essentia.standard import Envelope
 from scikits.audiolab import wavread, wavwrite
 from os import listdir
@@ -93,12 +94,18 @@ def clicks(file):
     curve = env(essentia.array(f))
     result = []
     i = 1
+    runmax = 0
     while i < len(curve):
         if curve[i] - curve[i - 1] > 0.05:
             result.append([i, curve[i]])
+            if curve[i] > runmax: runmax = curve[i]
             i += 1100 # advance the playhead by 1100 samples (~22 ms) to avoid closely-spaced clicks
             continue
         i += 1
+    # normalize output:
+    factor = 1. / runmax
+    for entry in result:
+        entry[1] *= factor
     return result, len(f)
 
 '''a numpy-optimized "sum at index" function'''
@@ -129,8 +136,18 @@ def transients(file, transients, decay):
         trans, sr, enc = wavread(transients[random.randint(0, len(transients) - 1)])
         # assume stereo, extract subset to length of ce
         trans = trans.reshape(-1)                 # flatten the array
-        tl = trans[0 : len(ce) * 2     : 2] * ce  # extract left & multiply by the envelope
-        tr = trans[1 : len(ce) * 2 + 1 : 2] * ce  # extract right & multiple by the envelope
+        tl = trans[0 : len(trans) : 2]  # extract left & multiply by the envelope
+        tr = trans[1 : len(trans) : 2]  # extract right & multiple by the envelope
+        if len(tl) < len(ce):
+            nl = np.zeros(len(ce))
+            nr = np.zeros(len(ce))
+            insert(nl, 0, tl)
+            insert(nr, 0, tr)
+            tl = nl * ce
+            tr = nr * ce
+        else:
+            tl = tl[0 : len(ce)] * ce
+            tr = tr[0 : len(ce)] * ce
         fin = np.vstack((tl, tr)).reshape((-1,), order='F')
         # scale the result according to onset strength:
         fin *= i[1]
@@ -149,6 +166,7 @@ def resonances(file, resonances, crossfadems):
     rampstart = len(rampup) * 2
     # compute the clicks used for boundaries
     idx, l = clicks(file)
+    idx = [[rampstart, 1.0]] + idx
     idx.append([l - ramplen, 0]) # add the last click so that we add the resonance for the last event
 
     env = envelope(file, 10, 30)
@@ -158,14 +176,27 @@ def resonances(file, resonances, crossfadems):
     for i in xrange(0, len(idx) - 1):
         # read in a random resonance:
         f = resonances[random.randint(0, len(resonances) - 1)]
-        print "using file " + f
         reson, sr, enc = wavread(f)
         # assume stereo. need to extract subset equal to onset length:
         reson = reson.reshape(-1) # flatten
         length = (idx[i + 1][0] - idx[i][0]) * 2 + ramplen
-        start = random.randint(0, len(reson) / 2 - length) # random start place
-        rl = reson[start : length + start : 2]
-        rr = reson[start + 1 : length + start + 1 : 2]
+        # TODO: check to ensure that len(reson) / 2 > length
+        rl = None
+        rr = None
+        if len(reson) >= length:
+            start = random.randint(0, len(reson) - length) # random start place
+            rl = reson[start : length + start : 2]
+            rr = reson[start + 1 : length + start + 1 : 2]
+        else:
+            # just copy the buffer into a zero-padded array:
+            print "else triggered"
+            print len(reson), length, length - len(reson)
+            temp = np.zeros(length)
+            insert(temp, 0, reson)
+            rl = temp[0::2]
+            rr = temp[1::2]
+            assert(len(rl) == len(rr) == length / 2)
+        # print length, len(rl), len(rr)
         # fade up rl & rr
         rl[:len(rampup)] *= rampup
         rr[:len(rampup)] *= rampup
