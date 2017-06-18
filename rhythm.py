@@ -152,6 +152,7 @@ def transients(file, transients, decay):
         # scale the result according to onset strength:
         fin *= i[1]
         insert(result, i[0] * 2, fin)
+    result *= 1. / result.max() # normalize
     return result.reshape(-1, 2)
 
 def resonances(file, resonances, crossfadems):
@@ -220,7 +221,15 @@ def applyenvelope(stereo, envelope):
     right = stereo[1::2] * envelope
     return np.vstack((left, right)).reshape((-1), order='F')
 
+def procFile(v, prefix):
+    wavwrite(transients(v, trans, 20), prefix + v[-9:-4] + '_trans00.wav', 44100, 'pcm24')
+    wavwrite(transients(v, trans, 10), prefix + v[-9:-4] + '_trans01.wav', 44100, 'pcm24')
+    wavwrite(resonances(v, reson, 10), prefix + v[-9:-4] + '_reson00.wav', 44100, 'pcm24')
+    wavwrite(resonances(v, reson, 15), prefix + v[-9:-4] + '_reson01.wav', 44100, 'pcm24')
+    return
 
+def procGestur(g, c, prefix):
+    wavwrite(resonances(g, c, 15), prefix + g[:-9:-4] + '_reson.wav', 44100, 'pcm24')
 
 
 
