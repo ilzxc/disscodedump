@@ -103,9 +103,10 @@ def clicks(file):
             continue
         i += 1
     # normalize output:
-    factor = 1. / runmax
-    for entry in result:
-        entry[1] *= factor
+    if runmax != 0:
+        factor = 1. / runmax
+        for entry in result:
+            entry[1] *= factor
     return result, len(f)
 
 '''a numpy-optimized "sum at index" function'''
@@ -126,10 +127,12 @@ def loadfile(file):
 def transients(file, transients, decay):
     '''
     articulates attacks indicated by the onset extraction using short-decay
-    samples of the 
+    samples of the glass stuff
     '''
     idx, l = clicks(file)
-    result = np.zeros(l * 2) # multiply by 2 for stereo
+    if len(idx) == 0:
+        return np.zeros(l * 2).reshape(-1, 2)
+    result = np.zeros(l * 2 + int((decay / 1000.) * 88200) + 2) # multiply by 2 for stereo
     ce = clicke(decay)
     for i in idx:
         # read in a random transient:
