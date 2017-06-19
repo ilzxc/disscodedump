@@ -232,9 +232,11 @@ def procGestur(g, c, prefix):
     wavwrite(resonances(g, c, 15), prefix + g[:-9:-4] + '_reson.wav', 44100, 'pcm24')
 
 
-
-
-
+def makeTransients(vox, prefix):
+    wavwrite(transients(v, trans, 100), prefix + v[-9:-4] + '_transLong.wav', 44100, 'pcm24')
+    wavwrite(transients(v, trans, 20), prefix + v[-9:-4] + '_transShort.wav', 44100, 'pcm24')
+    wavwrite(transients(v, bulbs, 100), prefix + v[-9:-4] + '_bulbs.wav', 44100, 'pcm24')
+    wavwrite(transients(v, tiny, 100), prefix + v[-9:-4] + '_tiny.wav', 44100, 'pcm24')
 
 
 
