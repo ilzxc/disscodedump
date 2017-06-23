@@ -241,7 +241,15 @@ def makeTransients(vox, prefix):
     wavwrite(transients(v, bulbs, 100), prefix + v[-9:-4] + '_bulbs.wav', 44100, 'pcm24')
     wavwrite(transients(v, tiny, 100), prefix + v[-9:-4] + '_tiny.wav', 44100, 'pcm24')
 
-
+def chord():
+    l = range(0, 23)
+    shuffle(l)
+    result = []
+    for item in l[:randint(2, 5)]:
+        cents = randint(0, 100) - 50
+        steps = randint(0, 24) - 12
+        result.append([item, steps, cents])
+    return result
 
 
 
